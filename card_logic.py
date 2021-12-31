@@ -173,6 +173,8 @@ def ColorFilter(deck, color_selection, color_list):
             filtered_color = AutoColors(deck, color_list, 2)
         elif color_data == "AI":
             filtered_color = "AI"
+        elif color_data == "RyanBot":
+            filtered_color = "RyanBot"
         else:
             filtered_color = [key for key, value in color_list.items() if value == color_data][0]
     except Exception as error:
@@ -250,12 +252,15 @@ def CalculateColorAffinity(deck_cards, color_filter, threshold):
         print("CalculateColorAffinity Error: %s" % error)
     return colors 
 
-def CardFilter(cards, deck, color, color_options, limits):
+def CardFilter(cards, deck, color, color_options, limits, ryanbot):
     if color == "AI":
         filtered_cards = CardAIFilter(cards, deck, color_options, limits)
+    elif color == "RyanBot":
+        filtered_cards = CardRyanBotFilter(cards, deck, limits, ryanbot)
     else:
         filtered_cards = CardColorFilter(cards, color, limits)
     return filtered_cards
+
 def CardColorFilter(card_list, color, limits):
     try:
         filtered_list = []
@@ -269,7 +274,24 @@ def CardColorFilter(card_list, color, limits):
     except Exception as error:
         print("CardColorFilter Error: %s" % error)
     return filtered_list
- 
+
+def CardRyanBotFilter(pack, deck, limits, ryanbot):
+    try:
+        filtered_list = []
+        pick_number = len(deck) + 1
+        print('pick_number', pick_number)
+        print('deck', list(map(lambda c: c['name'], deck)))
+        print('deck', len(list(map(lambda c: c['name'], deck))))
+        print()
+        for card in pack:
+            selected_card = card
+            selected_card["rating_all"] = CardRating(selected_card["deck_colors"]["All Decks"], limits["All Decks"])
+            selected_card["rating_filter"] = ryanbot.rating(pick_number, selected_card['name'])
+            filtered_list.append(selected_card)
+    except Exception as error:
+        print("CardRyanBotFilter Error: %s" % error)
+    return filtered_list
+
 def CardAIFilter(pack, deck, color_options, limits):
     try:
         filtered_list = []
