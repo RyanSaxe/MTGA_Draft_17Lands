@@ -73,6 +73,7 @@ import sys
 import io
 import file_extractor as FE
 import card_logic as CL
+from ryanbot import RyanBot
 
 # Global Constants
 ## The different types of draft.
@@ -240,7 +241,10 @@ def CopyClipboard(copy):
     return 
 
 class LogScanner:
-    def __init__(self,log_file, step_through, diag_log_enabled, os):
+    def __init__(self,log_file, step_through, diag_log_enabled, os,
+                 pack_callback=lambda: None,
+                 pick_callback=lambda: None,
+                 clear_callback=lambda: None):
         self.os = os
         self.log_file = log_file
         self.step_through = step_through
@@ -262,6 +266,9 @@ class LogScanner:
         self.current_pack = 0
         self.previous_picked_pack = 0
         self.current_picked_pick = 0
+        self.pack_callback = pack_callback
+        self.pick_callback = pick_callback
+        self.clear_callback = clear_callback
         
     def ClearDraft(self, full_clear):
         if full_clear:
@@ -282,6 +289,7 @@ class LogScanner:
         self.current_pack = 0
         self.previous_picked_pack = 0
         self.current_picked_pick = 0
+        self.clear_callback()
 
     def DraftStartSearch(self): 
         #Open the file
@@ -507,6 +515,9 @@ class LogScanner:
                             self.current_pack = pack
                             self.current_pick = pick
                             
+                            print("Picked - Pack: %u, Pick: %u, Cards: %s" % (pack, pick, self.picked_cards[pack_index]))
+                            self.pick_callback(pack, pick, self.set_data["card_ratings"][card]["name"])
+
                             if(self.step_through):
                                 break
     
@@ -571,6 +582,8 @@ class LogScanner:
                             self.current_pack = pack
                             self.current_pick = pick
                             
+                            self.pack_callback(pack, pick, parsed_cards)
+
                             if(self.step_through):
                                 break
     
@@ -579,7 +592,8 @@ class LogScanner:
                             print(error_string)
                             LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
                         print("Pack: %u, Pick: %u, Cards: %s" % (draft_data["SelfPack"], draft_data["SelfPick"], parsed_cards))
-             
+                        self.pick_callback(pack, pick, self.set_data["card_ratings"][card]["name"])
+
         except Exception as error:
             error_string = "DraftPackSearchPremierV2 Error: %s" % error
             print(error_string)
@@ -630,7 +644,8 @@ class LogScanner:
                             self.current_picked_pick = pick
     
                             print("Picked - Pack: %u, Pick: %u, Cards: %s" % (pack, pick, self.picked_cards[pack_index]))
-                            
+                            self.pick_callback(pack, pick, self.set_data["card_ratings"][card]["name"])
+
                             if self.step_through:
                                 break; 
                             
@@ -698,6 +713,8 @@ class LogScanner:
                                     
                                 self.current_pack = pack
                                 self.current_pick = pick
+
+                                self.pack_callback(pack, pick, parsed_cards)
                                 
                                 if(self.step_through):
                                     break
@@ -761,7 +778,8 @@ class LogScanner:
                             self.taken_cards.append(self.set_data["card_ratings"][card])
     
                             print("Picked - Pack: %u, Pick: %u, Cards: %s, offset: %u" % (pack, pick, self.picked_cards[pack_index], self.pack_offset))
-                            
+                            self.pick_callback(pack, pick, self.set_data["card_ratings"][card]["name"])
+
                             if self.step_through:
                                 break;
                             
@@ -778,7 +796,7 @@ class LogScanner:
             
     def RetrieveSet(self):
         file_location = ''
-        self.deck_colors = {"All Decks" : "","Auto" : "", "AI" : "", "W" : "","U" : "","B" : "","R" : "","G" : "","WU" : "","WB" : "","WR" : "","WG" : "","UB" : "","UR" : "","UG" : "","BR" : "","BG" : "","RG" : "","WUB" : "","WUR" : "","WUG" : "","WBR" : "","WBG" : "","WRG" : "","UBR" : "","UBG" : "","URG" : "","BRG" : ""}
+        self.deck_colors = {"All Decks" : "","Auto" : "", "AI" : "", "RyanBot" : "", "W" : "","U" : "","B" : "","R" : "","G" : "","WU" : "","WB" : "","WR" : "","WG" : "","UB" : "","UR" : "","UG" : "","BR" : "","BG" : "","RG" : "","WUB" : "","WUR" : "","WUG" : "","WBR" : "","WBG" : "","WRG" : "","UBR" : "","UBG" : "","URG" : "","BRG" : ""}
 
         draft_string = [x for x in draft_types_dict.keys() if draft_types_dict[x] == self.draft_type]
         draft_string.extend(list(draft_types_dict.keys()))
@@ -823,7 +841,7 @@ class LogScanner:
         except Exception as error:
             print("RetrieveSet Error: %s" % error)   
         return
-        
+
 class WindowUI:
     def __init__(self, root, filename, step_through, diag_log_enabled, os, themes, images, table_width):
         self.root = root
@@ -837,7 +855,11 @@ class WindowUI:
         self.step_through = step_through
         self.diag_log_enabled = diag_log_enabled
         self.os = os
-        self.draft = LogScanner(self.filename, self.step_through, self.diag_log_enabled, self.os)
+        self.ryanbot = RyanBot()
+        self.draft = LogScanner(self.filename, self.step_through, self.diag_log_enabled, self.os,
+            pack_callback=self.ryanbot.pack_callback,
+            pick_callback=self.ryanbot.pick_callback,
+            clear_callback=self.ryanbot.clear_callback)
         self.diag_log_file = self.draft.diag_log_file
         self.diag_log_enabled = self.draft.diag_log_enabled
         self.table_width = table_width
@@ -984,13 +1006,14 @@ class WindowUI:
             LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
         return list_box
         
-    def UpdatePackTable(self, card_list, taken_cards, filtered_color, color_options, limits):
+    def UpdatePackTable(self, card_list, taken_cards, filtered_color, color_options, limits, ryanbot):
         try:
             filtered_list = CL.CardFilter(card_list,
                                           taken_cards,
                                           filtered_color,
                                           color_options,
-                                          limits)
+                                          limits,
+                                          ryanbot)
             filtered_list.sort(key=lambda x : x["rating_filter"], reverse = True)
             # clear the previous rows
             for row in self.pack_table.get_children():
@@ -1020,7 +1043,7 @@ class WindowUI:
             print(error_string)
             LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
             
-    def UpdateMissingTable(self, current_pack, previous_pack, picked_cards, taken_cards, filtered_color, color_options, limits):
+    def UpdateMissingTable(self, current_pack, previous_pack, picked_cards, taken_cards, filtered_color, color_options, limits, ryanbot):
         try:
             for row in self.missing_table.get_children():
                 self.missing_table.delete(row)
@@ -1047,7 +1070,8 @@ class WindowUI:
                                                   taken_cards,
                                                   filtered_color,
                                                   color_options,
-                                                  limits)
+                                                  limits,
+                                                  ryanbot)
                     
                     filtered_list.sort(key=lambda x : x["rating_filter"], reverse = True)
                     
@@ -1062,14 +1086,15 @@ class WindowUI:
             print(error_string)
             LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
             
-    def UpdateTakenTable(self, taken_table, taken_cards, filtered_color, color_options,limits):
+    def UpdateTakenTable(self, taken_table, taken_cards, filtered_color, color_options, limits, ryanbot):
         try:
             
             filtered_list = CL.CardFilter(taken_cards,
                                           taken_cards,
                                           filtered_color,
                                           color_options,
-                                          limits)
+                                          limits,
+                                          ryanbot)
                     
             filtered_list.sort(key=lambda x : x["rating_filter"], reverse = True)
             
@@ -1231,14 +1256,16 @@ class WindowUI:
                              self.draft.taken_cards,
                              filtered_color,
                              self.draft.deck_colors,
-                             self.draft.deck_limits)
+                             self.draft.deck_limits,
+                             self.ryanbot)
         self.UpdateMissingTable(self.draft.pack_cards[pack_index],
                                 self.draft.initial_pack[pack_index],
                                 self.draft.picked_cards[pack_index],
                                 self.draft.taken_cards,
                                 filtered_color,
                                 self.draft.deck_colors,
-                                self.draft.deck_limits)   
+                                self.draft.deck_limits,
+                                self.ryanbot)
                                 
         self.UpdateDeckStatsCallback()
 
@@ -1401,7 +1428,8 @@ class WindowUI:
                                   self.draft.taken_cards,
                                   filtered_color,
                                   self.draft.deck_colors,
-                                  self.draft.deck_limits)
+                                  self.draft.deck_limits,
+                                  self.ryanbot)
             popup.attributes("-topmost", True)
         except Exception as error:
             error_string = "TakenCards Error: %s" % error
