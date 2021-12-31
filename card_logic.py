@@ -284,9 +284,12 @@ def CardRyanBotFilter(pack, deck, limits, ryanbot):
         print('deck', len(list(map(lambda c: c['name'], deck))))
         print()
         for card in pack:
+            #subtract 2 because deck already includes what was taken, so in order to get the right
+            # scores, we need to 
+            idx = max(min(pick_number - 2, ryanbot.t - 1), 0)
             selected_card = card
-            selected_card["rating_all"] = CardRating(selected_card["deck_colors"]["All Decks"], limits["All Decks"])
-            selected_card["rating_filter"] = ryanbot.rating(pick_number, selected_card['name'])
+            selected_card["rating_all"] = ryanbot.rating(idx, selected_card['name'], full_set=True)
+            selected_card["rating_filter"] = ryanbot.rating(idx, selected_card['name'])
             filtered_list.append(selected_card)
     except Exception as error:
         print("CardRyanBotFilter Error: %s" % error)

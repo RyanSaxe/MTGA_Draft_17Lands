@@ -1231,7 +1231,7 @@ class WindowUI:
                     self.deck_colors_options_list.append(data)
                     
             if len(self.deck_colors_options_list):        
-                selected_option = "Auto"
+                selected_option = "RyanBot"
                 
                 self.deck_colors_options_selection.set(options_list[selected_option])
                 print("deck_colors_options_list: %s" % str(self.deck_colors_options_list))
