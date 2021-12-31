@@ -24,7 +24,6 @@ class RyanBot:
         # when we get to a pack we ensure all cards are empty
         # we do this because we initialize all packs to be every card
         self.pack[idx, :] = 0.0
-        print(idx)
         for name in pack_card_names:
             card_idx = self.get_card_idx(name)
             self.pack[idx, card_idx] = 1
@@ -32,7 +31,6 @@ class RyanBot:
     def pick_callback(self, pack, pick, card_name):
         print('pick_callback!', pack, pick, card_name)
         idx = self.get_idx(pack, pick)
-        print(idx)
         if idx + 1 < self.t:
             card_idx = self.get_card_idx(card_name)
             self.shifted_picks[idx + 1] = card_idx

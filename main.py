@@ -399,8 +399,8 @@ class LogScanner:
         self.DraftStartSearch()
         
         if self.draft_type == DRAFT_TYPE_PREMIER_V1:
-            self.DraftPackSearchPremierV1()
             self.DraftPickedSearchPremierV1()
+            self.DraftPackSearchPremierV1()
         elif self.draft_type == DRAFT_TYPE_PREMIER_V2:
             self.DraftPackSearchPremierV2()
             self.DraftPickedSearchPremierV2()  
@@ -451,7 +451,7 @@ class LogScanner:
                             
                             self.previous_picked_pack = pack
                             self.current_picked_pick = pick
-                            
+                            self.pick_callback(pack, pick, self.set_data["card_ratings"][card]["name"])
                             if self.step_through:
                                 break; 
                             
@@ -468,7 +468,8 @@ class LogScanner:
     def DraftPackSearchPremierV1(self):
         offset = self.pack_offset
         draft_data = object()
-        draft_string = "[UnityCrossThreadLogger]Draft.Notify "
+        #draft_string = "[UnityCrossThreadLogger]Draft.Notify "
+        draft_string = "[UnityCrossThreadLogger]==> LogBusinessEvents "
         pack_cards = []
         pack = 0
         pick = 0
@@ -479,53 +480,68 @@ class LogScanner:
 
                 for line in log:
                     offset += len(line)
-                    
+                    #p1p1 = line.find(p1p1_string)
                     string_offset = line.find(draft_string)
-                    
                     if string_offset != -1:
+                        if "CardsInPack" not in line:
+                            continue
                         self.pack_offset = offset
-                        start_offset = line.find("{\"draftId\"")
-                        LogEntry(self.diag_log_file, line, self.diag_log_enabled)
-                        pack_cards = []
-                        #Identify the pack
-                        draft_data = json.loads(line[start_offset:])
-                        parsed_cards = []
-                        try:
-                                
-                            cards = draft_data["PackCards"].split(',') 
-                                
-                            for count, card in enumerate(cards):
-                                if card in self.set_data["card_ratings"].keys():
-                                    if len(self.set_data["card_ratings"][card]):
-                                        parsed_cards.append(self.set_data["card_ratings"][card]["name"])
-                                        pack_cards.append(self.set_data["card_ratings"][card])
-                                        pack = draft_data["SelfPack"]
-                                        pick = draft_data["SelfPick"]
-                                
-                            pack_index = (pick - 1) % 8
+                        draft_data = json.loads(json.loads(json.loads(line[len(draft_string):])["request"])["Payload"])
+                        # breakpoint()
+                        # draft_data["PackCards"] = str(draft_data["CardsInPack"])
+                        # draft_data["SelfPack"] = int(draft_data["Payload"]["PackNumber"])
+                        # draft_data["SelfPick"] = int(draft_data["Payload"]["PickNumber"])
+                    # elif string_offset != -1:
+                    #     self.pack_offset = offset
+                    #     start_offset = line.find("{\"draftId\"")
+                    #     LogEntry(self.diag_log_file, line, self.diag_log_enabled)
+                    #     #Identify the pack
+                    #     draft_data = json.loads(line[start_offset:])
+                    else:
+                        continue
+                    pack_cards = []
+                    parsed_cards = []
+                    try:
                             
-                            if self.current_pack != pack:
-                                self.initial_pack = [None] * 8
+                        cards = draft_data["CardsInPack"]
+                            
+                        for count, card in enumerate(cards):
+                            card = str(card)
+                            if card in self.set_data["card_ratings"].keys():
+                                if len(self.set_data["card_ratings"][card]):
+                                    parsed_cards.append(self.set_data["card_ratings"][card]["name"])
+                                    pack_cards.append(self.set_data["card_ratings"][card])
+                                    pack = draft_data["PackNumber"]
+                                    pick = draft_data["PickNumber"]
+                            
+                        pack_index = (pick - 1) % 8
+                        if self.previous_picked_pack != pack:
+                            self.picked_cards = [[] for i in range(8)]
+                                
+                        self.picked_cards[pack_index].append(self.set_data["card_ratings"][card]["name"])
                         
-                            if self.initial_pack[pack_index] == None:
-                                self.initial_pack[pack_index] = pack_cards
-                                
-                            self.pack_cards[pack_index] = pack_cards
+                        if self.current_pack != pack:
+                            self.initial_pack = [None] * 8
+                    
+                        if self.initial_pack[pack_index] == None:
+                            self.initial_pack[pack_index] = pack_cards
                             
-                            self.current_pack = pack
-                            self.current_pick = pick
-                            
-                            print("Picked - Pack: %u, Pick: %u, Cards: %s" % (pack, pick, self.picked_cards[pack_index]))
-                            self.pick_callback(pack, pick, self.set_data["card_ratings"][card]["name"])
+                        self.pack_cards[pack_index] = pack_cards
+                        
+                        self.current_pack = pack
+                        self.current_pick = pick
+                        self.pack_callback(pack, pick, parsed_cards)
+                        print("Picked - Pack: %u, Pick: %u, Cards: %s" % (pack, pick, self.picked_cards[pack_index]))
+                        #self.pick_callback(pack, pick, self.set_data["card_ratings"][card]["name"])
 
-                            if(self.step_through):
-                                break
-    
-                        except Exception as error:
-                            error_string = "DraftPackSearchPremierV1 Sub Error: %s" % error
-                            print(error_string)
-                            LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
-                        print("Pack: %u, Pick: %u, Cards: %s" % (draft_data["SelfPack"], draft_data["SelfPick"], parsed_cards))
+                        if(self.step_through):
+                            break
+
+                    except Exception as error:
+                        error_string = "DraftPackSearchPremierV1 Sub Error: %s" % error
+                        print(error_string)
+                        LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
+                    #print("Pack: %u, Pick: %u, Cards: %s" % (draft_data["SelfPack"], draft_data["SelfPick"], parsed_cards))
              
         except Exception as error:
             error_string = "DraftPackSearchPremierV1 Error: %s" % error
