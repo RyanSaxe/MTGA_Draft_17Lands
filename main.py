@@ -716,15 +716,6 @@ class LogScanner:
                                             pack = payload_data["PackNumber"] + 1
                                             pick = payload_data["PickNumber"] + 1
                                     
-                                pack_index = (pick - 1) % 8
-                                
-                                # if self.current_pack != pack:
-                                #     self.initial_pack = [None] * 8
-                            
-                                # if self.initial_pack[pack_index] == None:
-                                #     self.initial_pack[pack_index] = pack_cards
-                                    
-                                # self.pack_cards[pack_index] = pack_cards
                                 self.set_pack_cards(pack, pick, pack_cards)
                                     
                                 self.current_pack = pack
