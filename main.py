@@ -257,6 +257,8 @@ class LogScanner:
         self.draft_type = DRAFT_TYPE_UNKNOWN
         self.pick_offset = 0
         self.pack_offset = 0
+        self.pick_idxs = []
+        self.pack_idxs = []
         self.search_offset = 0
         self.draft_set = None
         self.current_pick = 0
@@ -416,7 +418,6 @@ class LogScanner:
         draft_string = "[UnityCrossThreadLogger]==> Event_PlayerDraftMakePick "
         pack = 0
         pick = 0
-        idxs = []
         #Identify and print out the log lines that contain the draft packs
         try:
             with open(self.log_file, 'r') as log:
@@ -444,9 +445,9 @@ class LogScanner:
                             card = str(param_data["GrpId"])
 
                             idx = ((pack - 1) * 14) + pick - 1
-                            if idx in idxs:
+                            if idx in self.pick_idxs:
                                 continue
-                            idxs.append(idx)
+                            self.pick_idxs.append(idx)
                             
                             pack_index = (pick - 1) % 8
                             
@@ -480,7 +481,6 @@ class LogScanner:
         pack_cards = []
         pack = 0
         pick = 0
-        idxs = []
         #Identify and print out the log lines that contain the draft packs
         try:
             with open(self.log_file, 'r') as log:
@@ -528,9 +528,9 @@ class LogScanner:
                                     pick = draft_data["SelfPick"]
                         
                         idx = ((pack - 1) * 14) + pick - 1
-                        if idx in idxs:
+                        if idx in self.pack_idxs:
                             continue
-                        idxs.append(idx)
+                        self.pack_idxs.append(idx)
 
                         pack_index = (pick - 1) % 8
                         if self.previous_picked_pack != pack:
