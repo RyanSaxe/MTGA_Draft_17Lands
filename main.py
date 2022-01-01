@@ -468,8 +468,8 @@ class LogScanner:
     def DraftPackSearchPremierV1(self):
         offset = self.pack_offset
         draft_data = object()
-        #draft_string = "[UnityCrossThreadLogger]Draft.Notify "
-        draft_string = "[UnityCrossThreadLogger]==> LogBusinessEvents "
+        draft_string = "[UnityCrossThreadLogger]Draft.Notify "
+        p1p1_string = "[UnityCrossThreadLogger]==> LogBusinessEvents "
         pack_cards = []
         pack = 0
         pick = 0
@@ -480,30 +480,35 @@ class LogScanner:
 
                 for line in log:
                     offset += len(line)
-                    #p1p1 = line.find(p1p1_string)
+                    p1p1 = line.find(p1p1_string)
                     string_offset = line.find(draft_string)
-                    if string_offset != -1:
+                    if p1p1 != -1:
                         if "CardsInPack" not in line:
                             continue
-                        self.pack_offset = offset
-                        draft_data = json.loads(json.loads(json.loads(line[len(draft_string):])["request"])["Payload"])
+                        draft_data = json.loads(json.loads(json.loads(line[len(p1p1_string):])["request"])["Payload"])
+                        pack_n = int(draft_data["PackNumber"])
+                        pick_n = int(draft_data["PickNumber"])
+                        #only use this data for P1P1
+                        if pack_n != 1 and pick_n != 1:
+                            continue
                         # breakpoint()
-                        # draft_data["PackCards"] = str(draft_data["CardsInPack"])
-                        # draft_data["SelfPack"] = int(draft_data["Payload"]["PackNumber"])
-                        # draft_data["SelfPick"] = int(draft_data["Payload"]["PickNumber"])
-                    # elif string_offset != -1:
-                    #     self.pack_offset = offset
-                    #     start_offset = line.find("{\"draftId\"")
-                    #     LogEntry(self.diag_log_file, line, self.diag_log_enabled)
-                    #     #Identify the pack
-                    #     draft_data = json.loads(line[start_offset:])
+                        draft_data["PackCards"] = ",".join([str(card_id) for card_id in draft_data["CardsInPack"]])
+                        draft_data["SelfPack"] = int(draft_data["PackNumber"])
+                        draft_data["SelfPick"] = int(draft_data["PickNumber"])
+                        self.pack_offset = offset
+                    elif string_offset != -1:
+                        self.pack_offset = offset
+                        start_offset = line.find("{\"draftId\"")
+                        LogEntry(self.diag_log_file, line, self.diag_log_enabled)
+                        #Identify the pack
+                        draft_data = json.loads(line[start_offset:])
                     else:
                         continue
                     pack_cards = []
                     parsed_cards = []
                     try:
                             
-                        cards = draft_data["CardsInPack"]
+                        cards = draft_data["PackCards"].split(",")
                             
                         for count, card in enumerate(cards):
                             card = str(card)
@@ -511,8 +516,8 @@ class LogScanner:
                                 if len(self.set_data["card_ratings"][card]):
                                     parsed_cards.append(self.set_data["card_ratings"][card]["name"])
                                     pack_cards.append(self.set_data["card_ratings"][card])
-                                    pack = draft_data["PackNumber"]
-                                    pick = draft_data["PickNumber"]
+                                    pack = draft_data["SelfPack"]
+                                    pick = draft_data["SelfPick"]
                             
                         pack_index = (pick - 1) % 8
                         if self.previous_picked_pack != pack:
@@ -545,6 +550,7 @@ class LogScanner:
              
         except Exception as error:
             error_string = "DraftPackSearchPremierV1 Error: %s" % error
+            breakpoint()
             print(error_string)
             LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
         return pack_cards
