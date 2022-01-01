@@ -1155,14 +1155,16 @@ class WindowUI:
 
     def UpdateRankTable(self, rank_table, all_cards, filtered_color):
         try:
-                    
-            all_cards.sort(key=lambda x : x["rating_filter"], reverse = True)
+            for card in all_cards:
+                card["ranking"] = self.ryanbot.rating(self.ryanbot.last_idx, card["name"], full_set=True)
+
+            all_cards.sort(key=lambda x : x["ranking"], reverse = True)
             
             list_length = len(all_cards)
                 
             for count, card in enumerate(all_cards):
                 row_tag = CL.RowColorTag(card["colors"])
-                rank_table.insert("",index = count, iid = count, values = (card["name"], card["colors"], card["rating_all"]), tag = (row_tag,))
+                rank_table.insert("",index = count, iid = count, values = (card["name"], card["colors"], card["ranking"]), tag = (row_tag,))
             rank_table.bind("<<TreeviewSelect>>", lambda event: self.OnClickTable(event, table=rank_table, card_list=all_cards, selected_color=filtered_color))
         except Exception as error:
             error_string = "UpdateRankTable Error: %s" % error
@@ -1451,8 +1453,8 @@ class WindowUI:
         try:
             Grid.rowconfigure(popup, 1, weight = 1)
             Grid.columnconfigure(popup, 0, weight = 1)
-            
-            all_cards = copy.deepcopy(self.draft.set_data)
+            all_cards = [v for k,v in self.draft.set_data["card_ratings"].items()
+                            if v["name"].lower() not in ["plains", "island", "swamp", "mountain", "forest"]]
             
             headers = {"Card"  : {"width" : .6, "anchor" : W},
                        "Color" : {"width" : .2, "anchor" : CENTER},

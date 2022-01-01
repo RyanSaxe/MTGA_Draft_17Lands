@@ -12,6 +12,8 @@ class RyanBot:
     def __init__(self):
         self.model = self.load_model_and_attrs(MODEL_LOCATION)
         self.clear_callback()
+        # populate the predictions for every card in the set at p1p1 on init
+        self.run_prediction(1, 1, full_set=True)
     def get_idx(self, pack, pick):
         idx = ((pack - 1) * self.pack_size) + pick - 1
         self.last_idx = idx
@@ -64,7 +66,7 @@ class RyanBot:
         else:
             card_rating = self.predictions[idx, card_idx]
         print('rating', card_name, card_rating)
-        return np.round(card_rating, 3)
+        return card_rating
 #        return self.predictions[pick_number][lookup_card(card_name)]
     def get_card_idx(self, card_name):
         name = card_name.lower().split("//")[0].strip()
