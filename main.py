@@ -262,12 +262,12 @@ class LogScanner:
         self.pack_idxs = []
         self.search_offset = 0
         self.draft_set = None
-        self.current_pick = 0
         self._taken_cards = OrderedDict()
         self._pack_cards = OrderedDict()
         self.current_pack = 0
-        self.previous_picked_pack = 0
-        self.current_picked_pick = 0
+        self.current_pick = 0
+        self.latest_pack = 0
+        self.latest_pick = 0
         self.pack_callback = pack_callback
         self.pick_callback = pick_callback
         self.clear_callback = clear_callback
@@ -283,12 +283,12 @@ class LogScanner:
         self.pick_offset = 0
         self.pack_offset = 0
         self.draft_set = None
-        self.current_pick = 0
         self._taken_cards = OrderedDict()
         self._pack_cards = OrderedDict()
         self.current_pack = 0
-        self.previous_picked_pack = 0
-        self.current_picked_pick = 0
+        self.current_pick = 0
+        self.latest_pack = 0
+        self.latest_pick = 0
         self.pick_idxs = []
         self.pack_idxs = []
         self.clear_callback()
@@ -469,9 +469,13 @@ class LogScanner:
                             self.pick_idxs.append(idx)
                             
                             self.set_taken_card(pack, pick, self.set_data["card_ratings"][card])
+
+                            # if something comes in out of order, make sure to display in the proper order
+                            self.latest_pack = max(pack, self.current_pack)
+                            self.latest_pick = max(pick, self.current_pick)
                             
-                            self.previous_picked_pack = pack
-                            self.current_picked_pick = pick
+                            self.current_pack = pack
+                            self.current_pick = pick
                             self.pick_callback(pack, pick, self.set_data["card_ratings"][card]["name"])
                             if self.step_through:
                                 break; 
@@ -520,11 +524,11 @@ class LogScanner:
                     elif string_offset != -1:
                         self.pack_offset = offset
                         start_offset = line.find("{\"draftId\"")
-                        LogEntry(self.diag_log_file, line, self.diag_log_enabled)
                         #Identify the pack
                         draft_data = json.loads(line[start_offset:])
                     else:
                         continue
+                    LogEntry(self.diag_log_file, line, self.diag_log_enabled)
                     pack_cards = []
                     parsed_cards = []
                     try:
@@ -547,6 +551,10 @@ class LogScanner:
 
                         self.set_pack_cards(pack, pick, pack_cards)
                         
+                        # if something comes in out of order, make sure to display in the proper order
+                        self.latest_pack = max(pack, self.current_pack)
+                        self.latest_pick = max(pick, self.current_pick)
+
                         self.current_pack = pack
                         self.current_pick = pick
                         self.pack_callback(pack, pick, parsed_cards)
@@ -603,7 +611,9 @@ class LogScanner:
                                         pick = draft_data["SelfPick"]
                                 
                             self.set_pack_cards(pack, pick, pack_cards)
-                            
+                            # if something comes in out of order, make sure to display in the proper order
+                            self.latest_pack = max(pack, self.current_pack)
+                            self.latest_pick = max(pick, self.current_pick)
                             self.current_pack = pack
                             self.current_pick = pick
                             
@@ -658,9 +668,11 @@ class LogScanner:
                             card = param_data["cardId"]
                             
                             self.set_taken_card(pack, pick, self.set_data["card_ratings"][card])
-
-                            self.previous_picked_pack = pack
-                            self.current_picked_pick = pick
+                            # if something comes in out of order, make sure to display in the proper order
+                            self.latest_pack = max(pack, self.current_pack)
+                            self.latest_pick = max(pick, self.current_pick)
+                            self.current_pack = pack
+                            self.current_pick = pick
     
                             self.pick_callback(pack, pick, self.set_data["card_ratings"][card]["name"])
 
@@ -720,7 +732,9 @@ class LogScanner:
                                             pick = payload_data["PickNumber"] + 1
                                     
                                 self.set_pack_cards(pack, pick, pack_cards)
-                                    
+                                # if something comes in out of order, make sure to display in the proper order
+                                self.latest_pack = max(pack, self.current_pack)
+                                self.latest_pick = max(pick, self.current_pick)
                                 self.current_pack = pack
                                 self.current_pick = pick
 
@@ -773,9 +787,11 @@ class LogScanner:
                             pack = pick_data["PackNumber"] + 1
                             pick = pick_data["PickNumber"] + 1
                             card = pick_data["CardId"]
-                                 
-                            self.previous_picked_pack = pack
-                            self.current_picked_pick = pick
+                            # if something comes in out of order, make sure to display in the proper order
+                            self.latest_pack = max(pack, self.current_pack)
+                            self.latest_pick = max(pick, self.current_pick)
+                            self.current_pack = pack
+                            self.current_pick = pick
                             
                             self.set_taken_card(pack, pick, self.set_data["card_ratings"][card])
     
@@ -1008,7 +1024,11 @@ class WindowUI:
             LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
         return list_box
         
-    def UpdatePackTable(self, card_list, taken_cards, filtered_color, color_options, limits, ryanbot):
+    def UpdatePackTable(self, card_list, taken_cards, filtered_color, color_options, limits, ryanbot, pack=None, pick=None):
+        if pack is None:
+            pack = self.draft.current_pack
+        elif pick is None:
+            pick = self.draft.current_pick
         try:
             filtered_list = CL.CardFilter(card_list,
                                           taken_cards,
@@ -1016,8 +1036,8 @@ class WindowUI:
                                           color_options,
                                           limits,
                                           ryanbot,
-                                          self.draft.current_pick,
-                                          self.draft.current_pack,
+                                          pick,
+                                          pack,
                                           )
             filtered_list.sort(key=lambda x : x["rating_filter"], reverse = True)
             # clear the previous rows
@@ -1137,7 +1157,7 @@ class WindowUI:
                 
             for count, card in enumerate(all_cards):
                 row_tag = CL.RowColorTag(card["colors"])
-                rank_table.insert("",index = count, iid = count, values = (card["name"], card["colors"], round(card["ranking"], 4)), tag = (row_tag,))
+                rank_table.insert("",index = count, iid = count, values = (count + 1, card["name"], card["colors"], round(card["ranking"], 4)), tag = (row_tag,))
             rank_table.bind("<<TreeviewSelect>>", lambda event: self.OnClickTable(event, table=rank_table, card_list=all_cards, selected_color=filtered_color))
         except Exception as error:
             error_string = "UpdateRankTable Error: %s" % error
@@ -1280,18 +1300,21 @@ class WindowUI:
             filtered_color = CL.ColorFilter(self.draft.taken_cards(), self.deck_colors_options_selection.get(), self.draft.deck_colors)
 
             self.UpdateCurrentDraft(self.draft.draft_set, self.draft.draft_type)
-            self.UpdatePackPick(self.draft.current_pack, self.draft.current_pick)
-            print("PP:", self.draft.current_pack, self.draft.current_pick)
+            self.UpdatePackPick(self.draft.latest_pack, self.draft.latest_pick)
+            print("PP:", self.draft.latest_pack, self.draft.latest_pick)
             
-            self.UpdatePackTable(self.draft.pack_cards(self.draft.current_pack, self.draft.current_pick), 
+            self.UpdatePackTable(self.draft.pack_cards(self.draft.latest_pack, self.draft.latest_pick), 
                                 self.draft.taken_cards(),
                                 filtered_color,
                                 self.draft.deck_colors,
                                 self.draft.deck_limits,
-                                self.ryanbot)
-            self.UpdateMissingTable(self.draft.pack_cards(self.draft.current_pack, self.draft.current_pick),
-                                    self.draft.initial_pack(self.draft.current_pack, self.draft.current_pick),
-                                    self.draft.picked_card(self.draft.current_pack, self.draft.current_pick),
+                                self.ryanbot,
+                                self.draft.latest_pack,
+                                self.draft.latest_pick
+                                )
+            self.UpdateMissingTable(self.draft.pack_cards(self.draft.latest_pack, self.draft.latest_pick),
+                                    self.draft.initial_pack(self.draft.latest_pack, self.draft.latest_pick),
+                                    self.draft.picked_card(self.draft.latest_pack, self.draft.latest_pick),
                                     self.draft.taken_cards(),
                                     filtered_color,
                                     self.draft.deck_colors,
@@ -1434,9 +1457,11 @@ class WindowUI:
             all_cards = [v for k,v in self.draft.set_data["card_ratings"].items()
                             if v["name"].lower() not in ["plains", "island", "swamp", "mountain", "forest"]]
             
-            headers = {"Card"  : {"width" : .6, "anchor" : W},
-                       "Color" : {"width" : .2, "anchor" : CENTER},
-                       "All"   : {"width" : .2, "anchor" : CENTER}}
+            headers = {"Rank"  : {"width" : .15, "anchor" : W},
+                        "Card"  : {"width" : .6, "anchor" : W},
+                       "Color" : {"width" : .1, "anchor" : CENTER},
+                       "All"   : {"width" : .15, "anchor" : CENTER},
+                       }
 
             rank_table_frame = Frame(popup)
             rank_scrollbar = Scrollbar(rank_table_frame, orient=VERTICAL)
