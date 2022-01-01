@@ -1122,8 +1122,8 @@ class WindowUI:
                                           color_options,
                                           limits,
                                           ryanbot,
-                                          self.draft.current_pick,
-                                          self.draft.current_pack,
+                                          self.draft.latest_pick,
+                                          self.draft.latest_pack,
                                           )
                     
             filtered_list.sort(key=lambda x : x["rating_filter"], reverse = True)
@@ -1149,7 +1149,8 @@ class WindowUI:
     def UpdateRankTable(self, rank_table, all_cards, filtered_color):
         try:
             for card in all_cards:
-                card["ranking"] = self.ryanbot.rating(self.ryanbot.last_idx, card["name"], full_set=True)
+                idx = self.ryanbot.get_idx(self.draft.latest_pack, self.draft.latest_pick)
+                card["ranking"] = self.ryanbot.rating(idx, card["name"], full_set=True)
 
             all_cards.sort(key=lambda x : x["ranking"], reverse = True)
             
