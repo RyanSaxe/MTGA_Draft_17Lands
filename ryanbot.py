@@ -47,6 +47,7 @@ class RyanBot:
         self.predictions_out_of_pack = np.zeros((self.t, self.n_cards), dtype=np.float32)
         self.positions = np.arange(self.t, dtype=np.int32)
     def run_prediction(self, pack, pick, full_set=False):
+        #print(f"running prediction for P{pack}P{pick} with full_set={full_set}")
         model_input = (
             np.expand_dims(self.pack, 0),
             np.expand_dims(self.shifted_picks, 0),

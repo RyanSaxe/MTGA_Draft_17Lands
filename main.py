@@ -289,6 +289,8 @@ class LogScanner:
         self.current_pack = 0
         self.previous_picked_pack = 0
         self.current_picked_pick = 0
+        self.pick_idxs = []
+        self.pack_idxs = []
         self.clear_callback()
 
     def taken_cards(self):
@@ -1013,7 +1015,10 @@ class WindowUI:
                                           filtered_color,
                                           color_options,
                                           limits,
-                                          ryanbot)
+                                          ryanbot,
+                                          self.draft.current_pick,
+                                          self.draft.current_pack,
+                                          )
             filtered_list.sort(key=lambda x : x["rating_filter"], reverse = True)
             # clear the previous rows
             for row in self.pack_table.get_children():
@@ -1036,7 +1041,7 @@ class WindowUI:
             for count, card in enumerate(filtered_list):
                 row_tag = CL.RowColorTag(card["colors"])
                 
-                self.pack_table.insert("",index = count, iid = count, values = (card["name"], card["colors"], card["rating_all"], card["rating_filter"]), tag = (row_tag,))
+                self.pack_table.insert("",index = count, iid = count, values = (card["name"], card["colors"], round(card["rating_all"],4), round(card["rating_filter"],4)), tag = (row_tag,))
             self.pack_table.bind("<<TreeviewSelect>>", lambda event: self.OnClickTable(event, table=self.pack_table, card_list=card_list, selected_color=filtered_color))
         except Exception as error:
             error_string = "UpdatePackTable Error: %s" % error
@@ -1071,7 +1076,10 @@ class WindowUI:
                                                   filtered_color,
                                                   color_options,
                                                   limits,
-                                                  ryanbot)
+                                                  ryanbot,
+                                                  self.draft.current_pick,
+                                                  self.draft.current_pack,
+                                                  )
                     
                     filtered_list.sort(key=lambda x : x["rating_filter"], reverse = True)
                     
@@ -1079,7 +1087,7 @@ class WindowUI:
                         row_tag = CL.RowColorTag(card["colors"])
                         card_name = "*" + card["name"] if card["name"] == picked_card else card["name"]
                         
-                        self.missing_table.insert("",index = count, iid = count, values = (card_name, card["colors"], card["rating_all"], card["rating_filter"]), tag = (row_tag,))
+                        self.missing_table.insert("",index = count, iid = count, values = (card_name, card["colors"], round(card["rating_all"],4), round(card["rating_filter"],4)), tag = (row_tag,))
                     self.missing_table.bind("<<TreeviewSelect>>", lambda event: self.OnClickTable(event, table=self.missing_table, card_list=missing_cards, selected_color=filtered_color))
         except Exception as error:
             error_string = "UpdateMissingTable Error: %s" % error
@@ -1088,13 +1096,15 @@ class WindowUI:
             
     def UpdateTakenTable(self, taken_table, taken_cards, filtered_color, color_options, limits, ryanbot):
         try:
-            
             filtered_list = CL.CardFilter(taken_cards,
                                           taken_cards,
                                           filtered_color,
                                           color_options,
                                           limits,
-                                          ryanbot)
+                                          ryanbot,
+                                          self.draft.current_pick,
+                                          self.draft.current_pack,
+                                          )
                     
             filtered_list.sort(key=lambda x : x["rating_filter"], reverse = True)
             
@@ -1109,7 +1119,7 @@ class WindowUI:
                 
             for count, card in enumerate(filtered_list):
                 row_tag = CL.RowColorTag(card["colors"])
-                taken_table.insert("",index = count, iid = count, values = (card["name"], card["colors"], card["rating_all"], card["rating_filter"]), tag = (row_tag,))
+                taken_table.insert("",index = count, iid = count, values = (card["name"], card["colors"], round(card["rating_all"],4), round(card["rating_filter"],4)), tag = (row_tag,))
             taken_table.bind("<<TreeviewSelect>>", lambda event: self.OnClickTable(event, table=taken_table, card_list=taken_cards, selected_color=filtered_color))
         except Exception as error:
             error_string = "UpdateTakenTable Error: %s" % error
@@ -1127,7 +1137,7 @@ class WindowUI:
                 
             for count, card in enumerate(all_cards):
                 row_tag = CL.RowColorTag(card["colors"])
-                rank_table.insert("",index = count, iid = count, values = (card["name"], card["colors"], card["ranking"]), tag = (row_tag,))
+                rank_table.insert("",index = count, iid = count, values = (card["name"], card["colors"], round(card["ranking"], 4)), tag = (row_tag,))
             rank_table.bind("<<TreeviewSelect>>", lambda event: self.OnClickTable(event, table=rank_table, card_list=all_cards, selected_color=filtered_color))
         except Exception as error:
             error_string = "UpdateRankTable Error: %s" % error

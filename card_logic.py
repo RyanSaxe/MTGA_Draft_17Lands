@@ -252,11 +252,11 @@ def CalculateColorAffinity(deck_cards, color_filter, threshold):
         print("CalculateColorAffinity Error: %s" % error)
     return colors 
 
-def CardFilter(cards, deck, color, color_options, limits, ryanbot):
+def CardFilter(cards, deck, color, color_options, limits, ryanbot, pick_n, pack_n):
     if color == "AI":
-        filtered_cards = CardAIFilter(cards, deck, color_options, limits)
+        filtered_cards = CardAIFilter(cards, deck, color_options, limits, pick_n, pack_n)
     elif color == "RyanBot":
-        filtered_cards = CardRyanBotFilter(cards, deck, limits, ryanbot)
+        filtered_cards = CardRyanBotFilter(cards, deck, limits, ryanbot, pick_n, pack_n)
     else:
         filtered_cards = CardColorFilter(cards, color, limits)
     return filtered_cards
@@ -275,29 +275,25 @@ def CardColorFilter(card_list, color, limits):
         print("CardColorFilter Error: %s" % error)
     return filtered_list
 
-def CardRyanBotFilter(pack, deck, limits, ryanbot):
+def CardRyanBotFilter(pack, deck, limits, ryanbot, pick_n, pack_n):
     try:
         filtered_list = []
-        pick_number = len(deck) + 1
-
+        pick_number = ((pack_n - 1) * 14) + pick_n - 1
         for card in pack:
-            #subtract 2 because deck already includes what was taken, so in order to get the right
-            # scores, we need to 
-            idx = max(min(pick_number - 2, ryanbot.t - 1), 0)
             selected_card = card
-            selected_card["rating_all"] = ryanbot.rating(idx, selected_card['name'], full_set=True)
-            selected_card["rating_filter"] = ryanbot.rating(idx, selected_card['name'])
+            selected_card["rating_all"] = ryanbot.rating(pick_number, selected_card['name'], full_set=True)
+            selected_card["rating_filter"] = ryanbot.rating(pick_number, selected_card['name'])
             filtered_list.append(selected_card)
     except Exception as error:
         print("CardRyanBotFilter Error: %s" % error)
     return filtered_list
 
-def CardAIFilter(pack, deck, color_options, limits):
+def CardAIFilter(pack, deck, color_options, limits, pick_n, pack_n):
     try:
         filtered_list = []
         color_limit_start = 15
 
-        pick_number = len(deck) + 1
+        pick_number = ((pack_n - 1) * 14) + pick_n - 1
         
         color_count = 3 if pick_number < color_limit_start else 2
         
