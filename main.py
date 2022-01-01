@@ -70,6 +70,7 @@ import os
 import time 
 import getopt
 import sys
+import copy
 import io
 import file_extractor as FE
 import card_logic as CL
@@ -915,6 +916,7 @@ class WindowUI:
         self.datamenu.add_command(label="Reset Config", command=ResetConfig)
         self.cardmenu = Menu(self.menubar, tearoff=0)
         self.cardmenu.add_command(label="Taken Cards", command=self.TakenCardsPopup)
+        self.cardmenu.add_command(label="Rank Cards", command=self.RankCardsPopup)
         self.cardmenu.add_command(label="Suggest Decks", command=self.SuggestDeckPopup)
         self.menubar.add_cascade(label="File", menu=self.filemenu)
         self.menubar.add_cascade(label="Data", menu=self.datamenu)
@@ -1150,6 +1152,23 @@ class WindowUI:
             error_string = "UpdateTakenTable Error: %s" % error
             print(error_string)
             LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
+
+    def UpdateRankTable(self, rank_table, all_cards, filtered_color):
+        try:
+                    
+            all_cards.sort(key=lambda x : x["rating_filter"], reverse = True)
+            
+            list_length = len(all_cards)
+                
+            for count, card in enumerate(all_cards):
+                row_tag = CL.RowColorTag(card["colors"])
+                rank_table.insert("",index = count, iid = count, values = (card["name"], card["colors"], card["rating_all"]), tag = (row_tag,))
+            rank_table.bind("<<TreeviewSelect>>", lambda event: self.OnClickTable(event, table=rank_table, card_list=all_cards, selected_color=filtered_color))
+        except Exception as error:
+            error_string = "UpdateRankTable Error: %s" % error
+            print(error_string)
+            LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
+            
             
     def UpdateSuggestDeckTable(self, suggest_table, selected_color, suggested_decks, color_options):
         try:             
@@ -1425,6 +1444,39 @@ class WindowUI:
         self.DataViewUpdate(list_box)
         
         popup.attributes("-topmost", True)
+    def RankCardsPopup(self):
+        popup = Toplevel()
+        popup.wm_title("Rank Cards")
+        
+        try:
+            Grid.rowconfigure(popup, 1, weight = 1)
+            Grid.columnconfigure(popup, 0, weight = 1)
+            
+            all_cards = copy.deepcopy(self.draft.set_data)
+            
+            headers = {"Card"  : {"width" : .6, "anchor" : W},
+                       "Color" : {"width" : .2, "anchor" : CENTER},
+                       "All"   : {"width" : .2, "anchor" : CENTER}}
+
+            rank_table_frame = Frame(popup)
+            rank_scrollbar = Scrollbar(rank_table_frame, orient=VERTICAL)
+            rank_scrollbar.pack(side=RIGHT, fill=Y)
+            rank_table = self.CreateHeader(rank_table_frame, 20, headers, self.table_width)
+            rank_table.config(yscrollcommand=rank_scrollbar.set)
+            rank_scrollbar.config(command=rank_table.yview)
+            
+            rank_table_frame.grid(row=1, column=0, stick = "nsew")
+            rank_table.pack(expand = True, fill = "both")
+            
+            self.UpdateRankTable(rank_table,
+                                 all_cards,
+                                 self.draft.deck_colors,
+            )
+            popup.attributes("-topmost", True)
+        except Exception as error:
+            error_string = "Rank Cards Error: %s" % error
+            print(error_string)
+            LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)        
     def TakenCardsPopup(self):
         popup = Toplevel()
         popup.wm_title("Taken Cards")
