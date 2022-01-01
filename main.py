@@ -415,6 +415,7 @@ class LogScanner:
         draft_string = "[UnityCrossThreadLogger]==> Event_PlayerDraftMakePick "
         pack = 0
         pick = 0
+        idxs = []
         #Identify and print out the log lines that contain the draft packs
         try:
             with open(self.log_file, 'r') as log:
@@ -440,6 +441,11 @@ class LogScanner:
                             pack = int(param_data["Pack"])
                             pick = int(param_data["Pick"])
                             card = str(param_data["GrpId"])
+
+                            idx = ((pack - 1) * 14) + pick - 1
+                            if idx in idxs:
+                                continue
+                            idxs.append(idx)
                             
                             pack_index = (pick - 1) % 8
                             
@@ -473,6 +479,7 @@ class LogScanner:
         pack_cards = []
         pack = 0
         pick = 0
+        idxs = []
         #Identify and print out the log lines that contain the draft packs
         try:
             with open(self.log_file, 'r') as log:
@@ -518,7 +525,12 @@ class LogScanner:
                                     pack_cards.append(self.set_data["card_ratings"][card])
                                     pack = draft_data["SelfPack"]
                                     pick = draft_data["SelfPick"]
-                            
+                        
+                        idx = ((pack - 1) * 14) + pick - 1
+                        if idx in idxs:
+                            continue
+                        idxs.append(idx)
+
                         pack_index = (pick - 1) % 8
                         if self.previous_picked_pack != pack:
                             self.picked_cards = [[] for i in range(8)]
@@ -536,6 +548,7 @@ class LogScanner:
                         self.current_pack = pack
                         self.current_pick = pick
                         self.pack_callback(pack, pick, parsed_cards)
+                        
                         print("Picked - Pack: %u, Pick: %u, Cards: %s" % (pack, pick, self.picked_cards[pack_index]))
                         #self.pick_callback(pack, pick, self.set_data["card_ratings"][card]["name"])
 
