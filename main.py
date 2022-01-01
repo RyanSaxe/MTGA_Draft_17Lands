@@ -74,6 +74,7 @@ import io
 import file_extractor as FE
 import card_logic as CL
 from ryanbot import RyanBot
+from collections import OrderedDict
 
 # Global Constants
 ## The different types of draft.
@@ -261,10 +262,8 @@ class LogScanner:
         self.search_offset = 0
         self.draft_set = None
         self.current_pick = 0
-        self.picked_cards = [[] for i in range(8)]
-        self.taken_cards = []
-        self.pack_cards = [None] * 8
-        self.initial_pack = [None] * 8
+        self._taken_cards = OrderedDict()
+        self._pack_cards = OrderedDict()
         self.current_pack = 0
         self.previous_picked_pack = 0
         self.current_picked_pick = 0
@@ -284,14 +283,32 @@ class LogScanner:
         self.pack_offset = 0
         self.draft_set = None
         self.current_pick = 0
-        self.picked_cards = [[] for i in range(8)]
-        self.taken_cards = []
-        self.pack_cards = [None] * 8
-        self.initial_pack = [None] * 8
+        self._taken_cards = OrderedDict()
+        self._pack_cards = OrderedDict()
         self.current_pack = 0
         self.previous_picked_pack = 0
         self.current_picked_pick = 0
         self.clear_callback()
+
+    def taken_cards(self):
+        return self._taken_cards.values()
+
+    def set_taken_card(self, pack, pick, card):
+        self._taken_cards[(pack-1, pick-1)] = card
+
+    def pack_cards(self, pack, pick):
+        return self._pack_cards.get((pack-1, pick-1), [])
+
+    def set_pack_cards(self, pack, pick, cards):
+        self._pack_cards[(pack-1, pick-1)] = cards
+
+    def initial_pack(self, pack, pick):
+        return self._pack_cards.get((pack-1, (pick-1) % 8), [])
+
+    def picked_card(self, pack, pick):
+        taken = self._taken_cards.get((pack-1, (pick-1) % 8), None)
+        if taken:
+            return taken['name']
 
     def DraftStartSearch(self): 
         #Open the file
@@ -310,7 +327,7 @@ class LogScanner:
             previous_draft_type = self.draft_type
             previous_draft_set = self.draft_set
             with open(self.log_file, 'r', errors="ignore") as log:
-                print("DraftStarSearch: %u" % offset)
+                #print("DraftStarSearch: %u" % offset)
                 log.seek(offset)
                 for line in log:
                     offset += len(line)
@@ -319,7 +336,7 @@ class LogScanner:
                         string_offset = line.find(search_string)
                         if string_offset != -1:
                             self.search_offset = offset
-                            print("Draft found at %u" % offset)
+                            #print("Draft found at %u" % offset)
                             start_parser = switcher.get(search_string, lambda: None)
                             event_data = json.loads(line[string_offset + len(search_string):])
                             start_parser(event_data, offset)
@@ -395,7 +412,7 @@ class LogScanner:
             
     #Wrapper function for performing a search based on the draft type
     def DraftSearch(self):
-        print("Draft Search")
+        #print("Draft Search")
         #if self.draft_set == None:
         #    self.ClearDraft(False)
         self.DraftStartSearch()
@@ -448,13 +465,7 @@ class LogScanner:
                                 continue
                             self.pick_idxs.append(idx)
                             
-                            pack_index = (pick - 1) % 8
-                            
-                            if self.previous_picked_pack != pack:
-                                self.picked_cards = [[] for i in range(8)]
-                            
-                            self.picked_cards[pack_index].append(self.set_data["card_ratings"][card]["name"])
-                            self.taken_cards.append(self.set_data["card_ratings"][card])
+                            self.set_taken_card(pack, pick, self.set_data["card_ratings"][card])
                             
                             self.previous_picked_pack = pack
                             self.current_picked_pick = pick
@@ -531,26 +542,11 @@ class LogScanner:
                             continue
                         self.pack_idxs.append(idx)
 
-                        pack_index = (pick - 1) % 8
-                        if self.previous_picked_pack != pack:
-                            self.picked_cards = [[] for i in range(8)]
-                                
-                        self.picked_cards[pack_index].append(self.set_data["card_ratings"][card]["name"])
-                        
-                        if self.current_pack != pack:
-                            self.initial_pack = [None] * 8
-                    
-                        if self.initial_pack[pack_index] == None:
-                            self.initial_pack[pack_index] = pack_cards
-                            
-                        self.pack_cards[pack_index] = pack_cards
+                        self.set_pack_cards(pack, pick, pack_cards)
                         
                         self.current_pack = pack
                         self.current_pick = pick
                         self.pack_callback(pack, pick, parsed_cards)
-                        
-                        print("Picked - Pack: %u, Pick: %u, Cards: %s" % (pack, pick, self.picked_cards[pack_index]))
-                        #self.pick_callback(pack, pick, self.set_data["card_ratings"][card]["name"])
 
                         if(self.step_through):
                             break
@@ -559,7 +555,6 @@ class LogScanner:
                         error_string = "DraftPackSearchPremierV1 Sub Error: %s" % error
                         print(error_string)
                         LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
-                    #print("Pack: %u, Pick: %u, Cards: %s" % (draft_data["SelfPack"], draft_data["SelfPick"], parsed_cards))
              
         except Exception as error:
             error_string = "DraftPackSearchPremierV1 Error: %s" % error
@@ -604,15 +599,7 @@ class LogScanner:
                                         pack = draft_data["SelfPack"]
                                         pick = draft_data["SelfPick"]
                                 
-                            pack_index = (pick - 1) % 8
-                            
-                            if self.current_pack != pack:
-                                self.initial_pack = [None] * 8
-                        
-                            if self.initial_pack[pack_index] == None:
-                                self.initial_pack[pack_index] = pack_cards
-                                
-                            self.pack_cards[pack_index] = pack_cards
+                            self.set_pack_cards(pack, pick, pack_cards)
                             
                             self.current_pack = pack
                             self.current_pick = pick
@@ -667,18 +654,11 @@ class LogScanner:
                             pick = int(param_data["pickNumber"])
                             card = param_data["cardId"]
                             
-                            pack_index = (pick - 1) % 8
-                            
-                            if self.previous_picked_pack != pack:
-                                self.picked_cards = [[] for i in range(8)]
-                                 
-                            self.picked_cards[pack_index].append(self.set_data["card_ratings"][card]["name"])
-                            self.taken_cards.append(self.set_data["card_ratings"][card])
-                            
+                            self.set_taken_card(pack, pick, self.set_data["card_ratings"][card])
+
                             self.previous_picked_pack = pack
                             self.current_picked_pick = pick
     
-                            print("Picked - Pack: %u, Pick: %u, Cards: %s" % (pack, pick, self.picked_cards[pack_index]))
                             self.pick_callback(pack, pick, self.set_data["card_ratings"][card]["name"])
 
                             if self.step_through:
@@ -736,15 +716,7 @@ class LogScanner:
                                             pack = payload_data["PackNumber"] + 1
                                             pick = payload_data["PickNumber"] + 1
                                     
-                                pack_index = (pick - 1) % 8
-                                
-                                if self.current_pack != pack:
-                                    self.initial_pack = [None] * 8
-                            
-                                if self.initial_pack[pack_index] == None:
-                                    self.initial_pack[pack_index] = pack_cards
-                                    
-                                self.pack_cards[pack_index] = pack_cards
+                                self.set_pack_cards(pack, pick, pack_cards)
                                     
                                 self.current_pack = pack
                                 self.current_pick = pick
@@ -758,7 +730,7 @@ class LogScanner:
                                 error_string = "DraftPackSearchQuick Sub Error: %s" % error
                                 print(error_string)
                                 LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
-                            print("Pack: %u, Pick: %u, Cards: %s" % (pack, pick, parsed_cards))
+                            #print("Pack: %u, Pick: %u, Cards: %s" % (pack, pick, parsed_cards))
             if log.closed == False:
                 log.close() 
         except Exception as error:
@@ -793,26 +765,17 @@ class LogScanner:
                             
                             request_data = json.loads(draft_data["request"])
                             payload_data = json.loads(request_data["Payload"])
-                            print("payload_data: %s" % str(payload_data))
                             pick_data = payload_data["PickInfo"]
-                            print("pick_data: %s" % str(pick_data))
                             
                             pack = pick_data["PackNumber"] + 1
                             pick = pick_data["PickNumber"] + 1
                             card = pick_data["CardId"]
-                            
-                            pack_index = (pick - 1) % 8
-                            
-                            if self.previous_picked_pack != pack:
-                                self.picked_cards = [[] for i in range(8)]
                                  
                             self.previous_picked_pack = pack
                             self.current_picked_pick = pick
                             
-                            self.picked_cards[pack_index].append(self.set_data["card_ratings"][card]["name"])
-                            self.taken_cards.append(self.set_data["card_ratings"][card])
+                            self.set_taken_card(pack, pick, self.set_data["card_ratings"][card])
     
-                            print("Picked - Pack: %u, Pick: %u, Cards: %s, offset: %u" % (pack, pick, self.picked_cards[pack_index], self.pack_offset))
                             self.pick_callback(pack, pick, self.set_data["card_ratings"][card]["name"])
 
                             if self.step_through:
@@ -867,7 +830,7 @@ class LogScanner:
                                 self.deck_colors[deck_color] = ratings_string
                             elif self.deck_colors[deck_color] == "":
                                 self.deck_colors[deck_color] = deck_color
-                    print("deck_colors: %s" % str(self.deck_colors))
+                    #print("deck_colors: %s" % str(self.deck_colors))
                 except Exception as error:
                     print("RetrieveSet Sub Error: %s" % error)
                     for deck_color in self.deck_colors.keys():
@@ -1078,7 +1041,7 @@ class WindowUI:
             print(error_string)
             LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
             
-    def UpdateMissingTable(self, current_pack, previous_pack, picked_cards, taken_cards, filtered_color, color_options, limits, ryanbot):
+    def UpdateMissingTable(self, current_pack, previous_pack, picked_card, taken_cards, filtered_color, color_options, limits, ryanbot):
         try:
             for row in self.missing_table.get_children():
                 self.missing_table.delete(row)
@@ -1112,7 +1075,7 @@ class WindowUI:
                     
                     for count, card in enumerate(filtered_list):
                         row_tag = CL.RowColorTag(card["colors"])
-                        card_name = "*" + card["name"] if card["name"] in picked_cards else card["name"]
+                        card_name = "*" + card["name"] if card["name"] == picked_card else card["name"]
                         
                         self.missing_table.insert("",index = count, iid = count, values = (card_name, card["colors"], card["rating_all"], card["rating_filter"]), tag = (row_tag,))
                     self.missing_table.bind("<<TreeviewSelect>>", lambda event: self.OnClickTable(event, table=self.missing_table, card_list=missing_cards, selected_color=filtered_color))
@@ -1208,7 +1171,7 @@ class WindowUI:
             else:
                 self.stat_table.config(height=1)
             
-            print(colors_filtered)
+            #print(colors_filtered)
             count = 0
             for color,values in colors_filtered.items():
                 row_tag = CL.RowColorTag(values["symbol"])
@@ -1269,43 +1232,48 @@ class WindowUI:
                 selected_option = "RyanBot"
                 
                 self.deck_colors_options_selection.set(options_list[selected_option])
-                print("deck_colors_options_list: %s" % str(self.deck_colors_options_list))
-                print("selected color %s,%s" % (options_list[selected_option], self.deck_colors_options_selection.get()))
+                #print("deck_colors_options_list: %s" % str(self.deck_colors_options_list))
+                #print("selected color %s,%s" % (options_list[selected_option], self.deck_colors_options_selection.get()))
         except Exception as error:
             error_string = "UpdateOptions Error: %s" % error
             print(error_string)
             LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)
             
     def UpdateCallback(self, *args):
-        self.draft.DraftSearch()
-        
-        if len(self.deck_colors_options_list) == 0:
-            self.UpdateOptions(self.draft.deck_colors)
-                
-        filtered_color = CL.ColorFilter(self.draft.taken_cards, self.deck_colors_options_selection.get(), self.draft.deck_colors)
+        try:
+            self.draft.DraftSearch()
+            
+            if len(self.deck_colors_options_list) == 0:
+                self.UpdateOptions(self.draft.deck_colors)
+                    
+            filtered_color = CL.ColorFilter(self.draft.taken_cards(), self.deck_colors_options_selection.get(), self.draft.deck_colors)
 
-        self.UpdateCurrentDraft(self.draft.draft_set, self.draft.draft_type)
-        self.UpdatePackPick(self.draft.current_pack, self.draft.current_pick)
-        pack_index = (self.draft.current_pick - 1) % 8
-        self.UpdatePackTable(self.draft.pack_cards[pack_index], 
-                             self.draft.taken_cards,
-                             filtered_color,
-                             self.draft.deck_colors,
-                             self.draft.deck_limits,
-                             self.ryanbot)
-        self.UpdateMissingTable(self.draft.pack_cards[pack_index],
-                                self.draft.initial_pack[pack_index],
-                                self.draft.picked_cards[pack_index],
-                                self.draft.taken_cards,
+            self.UpdateCurrentDraft(self.draft.draft_set, self.draft.draft_type)
+            self.UpdatePackPick(self.draft.current_pack, self.draft.current_pick)
+            print("PP:", self.draft.current_pack, self.draft.current_pick)
+            
+            self.UpdatePackTable(self.draft.pack_cards(self.draft.current_pack, self.draft.current_pick), 
+                                self.draft.taken_cards(),
                                 filtered_color,
                                 self.draft.deck_colors,
                                 self.draft.deck_limits,
                                 self.ryanbot)
-                                
-        self.UpdateDeckStatsCallback()
+            self.UpdateMissingTable(self.draft.pack_cards(self.draft.current_pack, self.draft.current_pick),
+                                    self.draft.initial_pack(self.draft.current_pack, self.draft.current_pick),
+                                    self.draft.picked_card(self.draft.current_pack, self.draft.current_pick),
+                                    self.draft.taken_cards(),
+                                    filtered_color,
+                                    self.draft.deck_colors,
+                                    self.draft.deck_limits,
+                                    self.ryanbot)
+                                    
+            self.UpdateDeckStatsCallback()
+        except Exception as error:
+            error_string = "UpdateCallback Error: %s" % error
+            print(error_string)
 
     def UpdateDeckStatsCallback(self, *args):
-        self.UpdateDeckStatsTable(self.draft.taken_cards, self.stat_options_selection.get())
+        self.UpdateDeckStatsTable(self.draft.taken_cards(), self.stat_options_selection.get())
 
     def UpdateUI(self):
         try:
@@ -1320,7 +1288,7 @@ class WindowUI:
                 while(1):
 
                     self.UpdateCallback()
-                    print("previous pick: %u, current pick: %u" % (previous_pick, self.draft.current_pick))
+                    #print("previous pick: %u, current pick: %u" % (previous_pick, self.draft.current_pick))
                     if self.draft.current_pack < previous_pack:
                         self.DraftReset(False)
                         self.UpdateCallback()
@@ -1433,11 +1401,11 @@ class WindowUI:
             Grid.rowconfigure(popup, 1, weight = 1)
             Grid.columnconfigure(popup, 0, weight = 1)
             
-            filtered_color = CL.ColorFilter(self.draft.taken_cards, 
+            filtered_color = CL.ColorFilter(self.draft.taken_cards(), 
                                             self.deck_colors_options_selection.get(), 
                                             self.draft.deck_colors)
             
-            copy_button = Button(popup, command=lambda:CopyTaken(self.draft.taken_cards,
+            copy_button = Button(popup, command=lambda:CopyTaken(self.draft.taken_cards(),
                                                                  self.draft.set_data,
                                                                  self.draft.draft_set,
                                                                  filtered_color),
@@ -1460,7 +1428,7 @@ class WindowUI:
             
             
             self.UpdateTakenTable(taken_table,
-                                  self.draft.taken_cards,
+                                  self.draft.taken_cards(),
                                   filtered_color,
                                   self.draft.deck_colors,
                                   self.draft.deck_limits,
@@ -1478,7 +1446,7 @@ class WindowUI:
         try:
             Grid.rowconfigure(popup, 3, weight = 1)
             
-            suggested_decks = CL.SuggestDeck(self.draft.taken_cards, self.draft.deck_colors, self.draft.deck_limits)
+            suggested_decks = CL.SuggestDeck(self.draft.taken_cards(), self.draft.deck_colors, self.draft.deck_limits)
             
             choices = ["None"]
             deck_color_options = {}
@@ -1571,7 +1539,7 @@ class WindowUI:
                                 json_data = json_file.read()
                             json_data = json.loads(json_data)
                             if json_data["meta"]["version"] == 1:
-                                print(json_data["meta"]["date_range"])
+                                #print(json_data["meta"]["date_range"])
                                 start_date, end_date = json_data["meta"]["date_range"].split("->")
                                 list_box.insert("", index = 0, values = (name_segments[0], name_segments[1], start_date, end_date))
                             elif json_data["meta"]["version"] == 2:

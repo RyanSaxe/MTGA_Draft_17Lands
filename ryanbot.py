@@ -17,7 +17,8 @@ class RyanBot:
         self.last_idx = idx
         return idx
     def pack_callback(self, pack, pick, pack_card_names):
-        print('pack_callback!', pack, pick, pack_card_names)
+        # print('pack_callback!', pack, pick, pack_card_names)
+        print('pack_callback!', pack, pick)
         idx = self.get_idx(pack, pick)
         # run predictions without considering pack context
         self.run_prediction(pack, pick, full_set=True)
@@ -29,11 +30,13 @@ class RyanBot:
             self.pack[idx, card_idx] = 1
         self.run_prediction(pack, pick)
     def pick_callback(self, pack, pick, card_name):
-        print('pick_callback!', pack, pick, card_name)
+#        print('pick_callback!', pack, pick, card_name)
+        print('pick_callback!', pack, pick)
         idx = self.get_idx(pack, pick)
         if idx + 1 < self.t:
             card_idx = self.get_card_idx(card_name)
             self.shifted_picks[idx + 1] = card_idx
+        self.run_prediction(pack, pick)
     def clear_callback(self):
         print('clear_callback!')
         self.pack = np.ones((self.t, self.n_cards), dtype=np.float32)
@@ -63,7 +66,7 @@ class RyanBot:
             card_rating = self.predictions_out_of_pack[idx, card_idx]
         else:
             card_rating = self.predictions[idx, card_idx]
-        print('rating', card_name, card_rating)
+        # print('rating', card_name, card_rating)
         return np.round(card_rating, 3)
 #        return self.predictions[pick_number][lookup_card(card_name)]
     def get_card_idx(self, card_name):
