@@ -264,10 +264,10 @@ class LogScanner:
         self.draft_set = None
         self._taken_cards = OrderedDict()
         self._pack_cards = OrderedDict()
-        self.current_pack = 0
-        self.current_pick = 0
-        self.latest_pack = 0
-        self.latest_pick = 0
+        self.current_pack = 1
+        self.current_pick = 1
+        self.latest_pack = 1
+        self.latest_pick = 1
         self.pack_callback = pack_callback
         self.pick_callback = pick_callback
         self.clear_callback = clear_callback
@@ -285,10 +285,10 @@ class LogScanner:
         self.draft_set = None
         self._taken_cards = OrderedDict()
         self._pack_cards = OrderedDict()
-        self.current_pack = 0
-        self.current_pick = 0
-        self.latest_pack = 0
-        self.latest_pick = 0
+        self.current_pack = 1
+        self.current_pick = 1
+        self.latest_pack = 1
+        self.latest_pick = 1
         self.pick_idxs = []
         self.pack_idxs = []
         self.clear_callback()
@@ -326,6 +326,7 @@ class LogScanner:
             #Check if a new player.log was created (e.g. application was started before Arena was started)
             if self.search_offset > os.path.getsize(self.log_file):
                 self.ClearDraft(True)
+                self.RetrieveSet()
             offset = self.search_offset
             previous_draft_type = self.draft_type
             previous_draft_set = self.draft_set
@@ -471,8 +472,11 @@ class LogScanner:
                             self.set_taken_card(pack, pick, self.set_data["card_ratings"][card])
 
                             # if something comes in out of order, make sure to display in the proper order
-                            self.latest_pack = max(pack, self.current_pack)
-                            self.latest_pick = max(pick, self.current_pick)
+                            cur_idx = ((pack - 1) * 14) + pick - 1
+                            last_idx = ((self.latest_pack - 1) * 14) + self.latest_pick - 1
+                            if last_idx <= cur_idx:
+                                self.latest_pack = pack
+                                self.latest_pick = pick
                             
                             self.current_pack = pack
                             self.current_pick = pick
@@ -552,9 +556,11 @@ class LogScanner:
                         self.set_pack_cards(pack, pick, pack_cards)
                         
                         # if something comes in out of order, make sure to display in the proper order
-                        self.latest_pack = max(pack, self.current_pack)
-                        self.latest_pick = max(pick, self.current_pick)
-
+                        cur_idx = ((pack - 1) * 14) + pick - 1
+                        last_idx = ((self.latest_pack - 1) * 14) + self.latest_pick - 1
+                        if last_idx <= cur_idx:
+                            self.latest_pack = pack
+                            self.latest_pick = pick
                         self.current_pack = pack
                         self.current_pick = pick
                         self.pack_callback(pack, pick, parsed_cards)
@@ -612,8 +618,11 @@ class LogScanner:
                                 
                             self.set_pack_cards(pack, pick, pack_cards)
                             # if something comes in out of order, make sure to display in the proper order
-                            self.latest_pack = max(pack, self.current_pack)
-                            self.latest_pick = max(pick, self.current_pick)
+                            cur_idx = ((pack - 1) * 14) + pick - 1
+                            last_idx = ((self.latest_pack - 1) * 14) + self.latest_pick - 1
+                            if last_idx <= cur_idx:
+                                self.latest_pack = pack
+                                self.latest_pick = pick
                             self.current_pack = pack
                             self.current_pick = pick
                             
@@ -669,8 +678,11 @@ class LogScanner:
                             
                             self.set_taken_card(pack, pick, self.set_data["card_ratings"][card])
                             # if something comes in out of order, make sure to display in the proper order
-                            self.latest_pack = max(pack, self.current_pack)
-                            self.latest_pick = max(pick, self.current_pick)
+                            cur_idx = ((pack - 1) * 14) + pick - 1
+                            last_idx = ((self.latest_pack - 1) * 14) + self.latest_pick - 1
+                            if last_idx <= cur_idx:
+                                self.latest_pack = pack
+                                self.latest_pick = pick
                             self.current_pack = pack
                             self.current_pick = pick
     
@@ -733,8 +745,11 @@ class LogScanner:
                                     
                                 self.set_pack_cards(pack, pick, pack_cards)
                                 # if something comes in out of order, make sure to display in the proper order
-                                self.latest_pack = max(pack, self.current_pack)
-                                self.latest_pick = max(pick, self.current_pick)
+                                cur_idx = ((pack - 1) * 14) + pick - 1
+                                last_idx = ((self.latest_pack - 1) * 14) + self.latest_pick - 1
+                                if last_idx <= cur_idx:
+                                    self.latest_pack = pack
+                                    self.latest_pick = pick
                                 self.current_pack = pack
                                 self.current_pick = pick
 
@@ -788,8 +803,11 @@ class LogScanner:
                             pick = pick_data["PickNumber"] + 1
                             card = pick_data["CardId"]
                             # if something comes in out of order, make sure to display in the proper order
-                            self.latest_pack = max(pack, self.current_pack)
-                            self.latest_pick = max(pick, self.current_pick)
+                            cur_idx = ((pack - 1) * 14) + pick - 1
+                            last_idx = ((self.latest_pack - 1) * 14) + self.latest_pick - 1
+                            if last_idx <= cur_idx:
+                                self.latest_pack = pack
+                                self.latest_pick = pick
                             self.current_pack = pack
                             self.current_pick = pick
                             
