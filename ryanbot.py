@@ -46,6 +46,9 @@ class RyanBot:
         self.predictions = np.zeros((self.t, self.n_cards), dtype=np.float32)
         self.predictions_out_of_pack = np.zeros((self.t, self.n_cards), dtype=np.float32)
         self.positions = np.arange(self.t, dtype=np.int32)
+        self.att_pack = None
+        self.att_pick = None
+        self.att_both = None
     def run_prediction(self, pack, pick, full_set=False):
         #print(f"running prediction for P{pack}P{pick} with full_set={full_set}")
         model_input = (
@@ -53,7 +56,7 @@ class RyanBot:
             np.expand_dims(self.shifted_picks, 0),
             np.expand_dims(self.positions, 0),
         )
-        model_output, _ = self.model(model_input, training=False, return_attention=True)
+        model_output, att = self.model(model_input, training=False, return_attention=True)
         idx = self.get_idx(pack, pick)
         prediction = np.squeeze(model_output)[idx]
         #self.rating(idx, self.idx_to_name[prediction])
@@ -61,7 +64,27 @@ class RyanBot:
             self.predictions_out_of_pack[idx] = prediction
         else:
             self.predictions[idx] = prediction
+            self.att_pack = att[0]
+            self.att_pick = att[1][0]
+            self.att_both = att[1][1]
 
+    def get_att_vec(self, pack, pick, which=None,slice_leading_zeros=False):
+        idx = self.get_idx(pack, pick)
+        if which == "pack":
+            att = self.att_pack
+        elif which == "pick":
+            att = self.att_pick
+        else:
+            att = self.att_both
+        out = att[0,:,idx,:idx + 1]
+        if slice_leading_zeros:
+            start_idx = np.where(out >= 1e-4)[1]
+            if len(start_idx) == 0:
+                slice_idx = 0
+            else:
+                slice_idx = min(start_idx)
+            out = (out, slice_idx)
+        return out
     def rating(self, idx, card_name, full_set=False):
 #        print(self.predictions)
         card_idx = self.get_card_idx(card_name)
@@ -85,5 +108,3 @@ class RyanBot:
         self.idx_to_name = attrs['idx_to_name']
         self.name_to_idx = {v:k for k,v in self.idx_to_name.items()}
         return model
-
-        

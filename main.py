@@ -76,6 +76,11 @@ import file_extractor as FE
 import card_logic as CL
 from ryanbot import RyanBot
 from collections import OrderedDict
+from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, 
+NavigationToolbar2Tk)
 
 # Global Constants
 ## The different types of draft.
@@ -917,9 +922,14 @@ class WindowUI:
         self.cardmenu.add_command(label="Taken Cards", command=self.TakenCardsPopup)
         self.cardmenu.add_command(label="Rank Cards", command=self.RankCardsPopup)
         self.cardmenu.add_command(label="Suggest Decks", command=self.SuggestDeckPopup)
+        self.attention_menu = Menu(self.menubar, tearoff=0)
+        self.attention_menu.add_command(label="Pack Attention", command=lambda: self.AttentionPopup("pack"))
+        self.attention_menu.add_command(label="Pick Attention", command=lambda: self.AttentionPopup("pick"))
+        self.attention_menu.add_command(label="Final Attention", command=lambda: self.AttentionPopup("final"))
         self.menubar.add_cascade(label="File", menu=self.filemenu)
         self.menubar.add_cascade(label="Data", menu=self.datamenu)
         self.menubar.add_cascade(label="Cards", menu=self.cardmenu)
+        self.menubar.add_cascade(label="Attention", menu=self.attention_menu)
         self.root.config(menu=self.menubar)
         
         style = Style()
@@ -1015,7 +1025,6 @@ class WindowUI:
         self.deck_colors_options_selection.trace("w", self.UpdateCallback)
         self.root.attributes("-topmost", True)
 
-        
     def CreateHeader(self, frame, height, headers, total_width):
         header_labels = tuple(headers.keys())
         list_box = Treeview(frame, columns = header_labels, show = 'headings')
@@ -1466,6 +1475,65 @@ class WindowUI:
         self.DataViewUpdate(list_box)
         
         popup.attributes("-topmost", True)
+    def AttentionPopup(self, which=None, popup=None):
+        try:
+            attention_weights, slice_leading_zeros = self.ryanbot.get_att_vec(self.draft.latest_pack, self.draft.latest_pick, which=which, slice_leading_zeros=True)
+            if popup is None:
+                popup = Toplevel()
+                popup.geometry('900x600')
+                popup.wm_title(f"{str(which)} Attention")
+                
+                refresh_att = Button(popup, command=lambda: self.AttentionPopup(which=which, popup=popup), text="refresh")
+                refresh_att.pack()
+            else:
+                for widget in popup.winfo_children():
+                    widget.destroy()
+                refresh_att = Button(popup, command=lambda: self.AttentionPopup(which=which, popup=popup), text="refresh")
+                refresh_att.pack()
+            # the figure that will contain the plot
+            pxpy = []
+            seq_l = attention_weights.shape[-1]
+            n_picks = 14
+            for i in range(seq_l):
+                px = i // n_picks + 1
+                py = (i % n_picks) + 1
+                pxpy.append("P" + str(int(px)) + "P" + str(int(py)))
+            pxpy = pxpy[slice_leading_zeros:]
+            attention_weights = attention_weights[:,slice_leading_zeros:]
+
+            fig = plt.figure(figsize=(900/96, 600/96), dpi=96)
+            plt.grid()
+            ax = plt.gca()
+            mat = ax.matshow(attention_weights)
+            ax.set_xticks(range(attention_weights.shape[-1]))
+            ax.set_yticks(range(attention_weights.shape[0]))
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(mat, cax=cax)
+
+            ax.set_xticklabels(pxpy, rotation=90)
+            plt.tight_layout()
+            # creating the Tkinter canvas
+            # containing the Matplotlib figure
+            canvas = FigureCanvasTkAgg(fig,
+                                    master = popup)  
+            canvas.draw()
+        
+            # placing the canvas on the Tkinter window
+            canvas.get_tk_widget().pack()
+        
+            # creating the Matplotlib toolbar
+            toolbar = NavigationToolbar2Tk(canvas,
+                                        popup)
+            toolbar.update()
+        
+            # placing the toolbar on the Tkinter window
+            canvas.get_tk_widget().pack()
+        except Exception as error:
+            error_string = "Attention Error: %s" % error
+            print(error_string)
+            LogEntry(self.diag_log_file, error_string, self.diag_log_enabled)  
+
     def RankCardsPopup(self):
         popup = Toplevel()
         popup.wm_title("Rank Cards")
